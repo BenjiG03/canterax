@@ -3,8 +3,6 @@ import sys
 
 try:
     # Try loading the converted YAML
-    # We can turn off strict validation effectively by just loading it? 
-    # Cantera 3.0 might be strict.
     sol = ct.Solution('jp10.yaml')
     print("Successfully loaded jp10.yaml")
     print(f"Species: {sol.n_species}")

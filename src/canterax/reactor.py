@@ -58,7 +58,7 @@ class ReactorNet(eqx.Module):
         
         term = diffrax.ODETerm(reactor_rhs)
         if solver is None:
-            # Optimal configuration found in hyperparameter sweep
+            # Default stiff solver configuration.
             solver = diffrax.Kvaerno5(
                 scan_kind="lax",
                 root_finder=diffrax.VeryChord(

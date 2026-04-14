@@ -63,9 +63,7 @@ def test_thermo():
     
     # Calculate errors
     def get_max_rel_error(val, ref):
-        # Avoid division by zero, though h can be zero.
-        # For enthalpy, use absolute error relative to a reference scale if needed, 
-        # but here we'll just use max relative error for cp and rho.
+        # Avoid division by zero in relative-error calculations.
         abs_err = np.abs(val - ref)
         rel_err = abs_err / (np.abs(ref) + 1e-15)
         return np.max(rel_err)

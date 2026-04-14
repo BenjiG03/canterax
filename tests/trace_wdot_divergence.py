@@ -14,17 +14,12 @@ from canterax.solution import Solution
 from canterax.kinetics import compute_wdot
 
 def trace_divergence(mech_name, yaml_file, condition):
-    # Construct absolute path to yaml file if it's gri30.yaml which might not be local
+    # Keep the mechanism path as provided; Cantera resolves built-ins.
     if yaml_file == "gri30.yaml":
-        # Usually Cantera finds gri30.yaml automatically, but load_mechanism might need help if it uses strict paths
-        # But load_mechanism uses Cantera to parse, passing the string path.
         pass
 
     full_yaml_path = yaml_file
     if not os.path.exists(full_yaml_path) and yaml_file == "gri30.yaml":
-        # Try to find where Cantera keeps it or just pass "gri30.yaml" assuming Cantera resolves it
-        # But load_mechanism might fail if it tries to open the file directly without Cantera's search path logic
-        # Let's hope load_mechanism handles "gri30.yaml" correctly (it uses ct.Solution)
         pass
 
     print(f"\n{'='*30}\nAnalyzing {mech_name}...\n{'='*30}")
@@ -38,8 +33,7 @@ def trace_divergence(mech_name, yaml_file, condition):
         print(f"Failed to load mechanism: {e}")
         return
     
-    # Parse composition to dict to be safe
-    # But condition[2] is a string. Let's just pass it.
+    # Composition is passed as a Cantera composition string.
     input_str = condition[2]
     T, P = condition[0], condition[1]
     
@@ -47,7 +41,7 @@ def trace_divergence(mech_name, yaml_file, condition):
     sol_ct.TPX = T, P, input_str
     sol_jt.TPX = T, P, input_str
 
-    # Debug State
+    # State summary
     print(f"State: T={sol_ct.T:.1f} K, P={sol_ct.P:.1f} Pa")
     h_idx = sol_ct.species_index("H") if "H" in sol_ct.species_names else -1
     if h_idx >= 0:

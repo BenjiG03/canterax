@@ -39,8 +39,7 @@ def open_constp_reactor_rhs(t, state, args):
 
     # Mixture properties / chemistry for reactor state
     # wdot: [mol/m3/s], h_mass: [J/kg], cp_mass: [J/kg/K], rho: [kg/m3], h_mol: [J/mol]
-    # Use the underlying (non-jitted) functions so the outer jit can compile
-    # the full RHS as one fused XLA computation.
+    # Use non-jitted callables so the outer JIT traces the full RHS.
     wdot, h_mass, cp_mass, rho, h_mol = _compute_wdot(T, P, Y, mech)
 
     # Inlet thermodynamic state (use same mechanism, pressure)

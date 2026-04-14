@@ -201,7 +201,7 @@ def test_mass_flow_controller_rhs_jittable_single_trace():
     hlo_obj = lowered.compiler_ir(dialect="hlo")
     hlo = hlo_obj.as_hlo_text() if hasattr(hlo_obj, "as_hlo_text") else str(hlo_obj)
 
-    # A very lightweight sanity check that we got a single compiled computation.
+    # Check that lowering produced an HLO module.
     assert "HloModule" in hlo
 
 

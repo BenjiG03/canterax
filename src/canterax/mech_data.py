@@ -40,15 +40,14 @@ class MechData(eqx.Module):
     products_idx: jax.Array
     products_nu: jax.Array
     
-    # Legacy dense matrices (kept for backward compatibility or parallel paths)
-    # TODO: Remove after full transition
+    # Legacy dense matrices retained for compatibility.
     reactant_stoich: jax.Array      # (n_reactions, n_species)
     product_stoich: jax.Array       # (n_reactions, n_species)
     net_stoich: jax.Array           # (n_reactions, n_species)
     
     # Arrhenius parameters (converted to mol units)
     # k = A * T^b * exp(-Ea / (R * T))
-    # Ea is in J/mol (loader was using kJ/mol, but handoff says J/mol. loader.py confirmed it was J/mol internally but labeled kJ/mol in comments)
+    # Ea is in J/mol.
     A: jax.Array                    # (n_reactions,)
     b: jax.Array                    # (n_reactions,)
     Ea: jax.Array                   # (n_reactions,) J/mol

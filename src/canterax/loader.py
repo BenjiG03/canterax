@@ -128,8 +128,7 @@ def load_mechanism(yaml_file: str) -> MechData:
                 if len(tp) == 3:
                     troe_params[i, 3] = 1e30 # Large T** effectively disables it
             else:
-                # Lindemann: F_cent = 1.0
-                # We can simulate this with Troe [1.0, 1e30, 1e30, 1e30]
+                # Lindemann limit represented with a degenerate Troe parameter set.
                 has_troe[i] = True
                 troe_params[i] = [1.0, 1e30, 1e30, 1e30]
                 
@@ -147,8 +146,7 @@ def load_mechanism(yaml_file: str) -> MechData:
     max_reactants = max(n_reac_list) if n_reac_list else 0
     max_products = max(n_prod_list) if n_prod_list else 0
     
-    # Max efficiencies (only for reactions that have explicit efficiencies != default)
-    # Actually, let's just use the ones that are != default_efficiency
+    # Max count of explicit third-body efficiencies.
     n_eff_list = []
     for rxn in sol.reactions():
         if rxn.third_body:
@@ -180,8 +178,7 @@ def load_mechanism(yaml_file: str) -> MechData:
                 efficiencies_idx[i, j] = sol.species_index(sp)
                 efficiencies_val[i, j] = eff
         else:
-            default_efficiency[i] = 1.0 # Standard default for non-3-body? 
-            # Actually if not is_three_body, this value shouldn't matter but let's be safe.
+            default_efficiency[i] = 1.0
 
     # 4. Experimental BCOO Sparse Matrices
     from jax.experimental import sparse

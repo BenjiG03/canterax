@@ -54,8 +54,7 @@ def debug_units():
         ratio = conc_jt[idx] / conc_ct[idx]
         print(f"  {name}: JT={conc_jt[idx]:.4e}, CT={conc_ct[idx]:.4e}, ratio={ratio:.6f}")
     
-    # Cantera uses mol/m^3, which we should match
-    # Let's check density
+    # Cantera uses mol/m^3; verify density consistency.
     print(f"\n--- Density ---")
     print(f"  Canterax: {float(rho):.6f} kg/m^3")
     print(f"  Cantera: {sol_ct.density:.6f} kg/m^3")
