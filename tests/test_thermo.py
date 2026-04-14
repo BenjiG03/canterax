@@ -48,7 +48,7 @@ def test_thermo():
         
         # Canterax
         Y = jnp.array(sol.Y)
-        cp, h, rho = compute_mixture_props(T, P, Y, mech)
+        cp, h, rho, _ = compute_mixture_props(T, P, Y, mech)
         cp_canterax.append(float(cp))
         h_canterax.append(float(h))
         rho_canterax.append(float(rho))
