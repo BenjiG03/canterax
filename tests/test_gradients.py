@@ -91,7 +91,7 @@ def compare_gradients(name, yaml_file, T0, P0, X0, t_grad=1e-7, eps=1e-8, max_sp
         
         grad_ct_fd[i] = (T_plus_ct - T_minus_ct) / (2 * eps)
         
-        # 2. Canterax FD (as a sanity check for AD)
+        # 2. Canterax FD reference
         T_plus_jt = float(get_final_T(jnp.array(Y_plus)))
         T_minus_jt = float(get_final_T(jnp.array(Y_minus)))
         grad_jt_fd[i] = (T_plus_jt - T_minus_jt) / (2 * eps)

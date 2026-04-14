@@ -288,7 +288,7 @@ def validate_mechanism(name, yaml_path, initial_conditions, skip_sensitivity=Fal
     print(f"--- Performance Benchmarking ---", flush=True)
     jit_w, warm_w = run_performance_bench(compute_wdot, (T0, P0, sol_jt.Y, mech_jt), "compute_wdot")
     
-    # Canterax 1ms Benchmark (No saveat, just t_end)
+    # Canterax 1ms benchmark (t_end only, no saveat)
     def advance_bench(y):
         return net_jt.advance(T0, P0, y, t_end, solver=jt_solver)
     
@@ -372,11 +372,7 @@ def main():
 
     for name, yaml_path, cond in test_cases:
         res_kv = validate_mechanism(name, yaml_path, cond, solver_name="kvaerno")
-        # For detailed comparison, we can also run BDF but let's stick to Kvaerno5 as primary validation to save time by default
-        # Unless user wants full matrix. Let's run BDF for the first case (Methane) and JP-10 as spot checks, or just Kvaerno for all.
-        # Given "more hydrocarbon mechanisms", broad coverage is better.
-        # But let's run just Kvaerno for new additions to keep runtime reasonable, and maybe BDF for original cases.
-        # Actually, let's run both for robustness as requested.
+        # Run both solvers for coverage.
         try:
             res_bdf = validate_mechanism(name, yaml_path, cond, solver_name="bdf")
         except Exception as e:

@@ -23,8 +23,8 @@ def test_loader_gri30():
     print(f"Species: {mech.n_species} (Cantera: {sol.n_species})")
     print(f"Reactions: {mech.n_reactions} (Cantera: {sol.n_reactions})")
     
-    # Check MW
-    mw_cantera = sol.molecular_weights / 1000.0 # kg/kmol -> kg/mol
+    # Check MW (Canterax stores kg/kmol, same as Cantera)
+    mw_cantera = sol.molecular_weights
     mw_error = jnp.max(jnp.abs(mech.mol_weights - mw_cantera))
     print(f"Max MW error: {mw_error:.2e}")
     

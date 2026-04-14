@@ -84,8 +84,7 @@ def bdf_step(state, fun, args, rtol, atol):
     L = get_bdf_coefficients(order)
     l0, l1 = L[0], L[1]
     
-    # Use cached LU/Piv if they match current h and order (Phase 2 logic)
-    # For Phase 1, we just use what's in state.
+    # Use cached LU/Piv from the current state.
     lu, piv = state.lu, state.piv
     
     def newton_body(val):
@@ -183,7 +182,7 @@ def bdf_solve(fun, t0, t1, y0, args=(), rtol=1e-6, atol=1e-9, max_steps=4000):
         
         def on_success(ns):
             h_scale = jnp.clip(0.8 / (ns.error_ratio ** (1.0 / (ns.order + 1.0))), 0.1, 5.0)
-            # Dampen growth if we just changed order or failed (steps_at_current_order is small)
+            # Dampen growth after recent order changes or failures.
             h_scale = jnp.where(ns.steps_at_current_order <= ns.order + 1, jnp.minimum(1.0, h_scale), h_scale)
             
             # Hold h constant if growth is small (helps LU reuse)

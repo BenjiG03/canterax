@@ -85,32 +85,22 @@ def equilibrate(sol, mode='TP', rtol=1e-10, max_steps=2000):
     gi_const_all = (g_standard_RT + log_p_ratio)
     gi_const = gi_const_all[active_species_idx]
     
-    # 3. Basis Selection (QR pivoting on A.T)
-    # Goal: pick N_elements species that are stable and span the elements.
-    # Weight A.T by exp(-g) or similar to prefer stable species?
-    # Actually, just QR on A_active.T works to find a basis.
-    # We'll use a simple pivot-based approach or just solve for lams using n0.
-    
-    # Improved initial guess for lams:
-    # Use the species with highest concentrations to estimate lams
-    # n_active_0: initial mol/kg
-    # For species with n_i > 0, g_i + ln(n_i/ntot) approx A_i @ lams
-    # We can solve this as a weighted least squares for initial lams.
+    # 3. Initial guess for element potentials.
+    # Estimate lambda from a weighted least-squares fit:
+    # g_i + ln(n_i / n_tot) ~= A_i @ lambda.
     
     n_active0 = n0[active_species_idx]
     ntot0 = jnp.maximum(jnp.sum(n_active0), 1e-10)
     
-    # Weight by sqrt(n) to focus on major species
+    # Weight major species more strongly.
     weights = jnp.sqrt(jnp.maximum(n_active0 / ntot0, 1e-6))
     rhs = (gi_const + jnp.log(jnp.maximum(n_active0 / ntot0, 1e-10))) * weights
     design_mat = A_active.T * weights[:, None]
     
-    # Solve for initial lams: design_mat @ lams = rhs
+    # Solve design_mat @ lams = rhs.
     lams0, _, _, _ = jnp.linalg.lstsq(design_mat, rhs)
     
-    # Initial s (log concentrations) should be consistent with these lams
-    # s_i = A_i @ lams - g_i + ln(ntot)
-    # But for initialization, we can just use the lams and ntot
+    # Initial log-concentrations from lambda and n_tot.
     s0 = (A_active.T @ lams0) - gi_const + jnp.log(ntot0)
     
     log_nt0 = jnp.log(ntot0)

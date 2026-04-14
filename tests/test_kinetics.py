@@ -49,7 +49,7 @@ def test_kinetics():
             print(f"  kf: Cantera={kf_cantera_raw[j]:.3e}, Canterax={kf_canterax[j]:.3e}")
             print(f"  Kc: Cantera={kc_cantera_raw[j]:.3e}, Canterax={kc_canterax[j]:.3e}")
         
-        wdot_canterax, _, _, _ = compute_wdot(T, P, Y, mech)
+        wdot_canterax, _, _, _, _ = compute_wdot(T, P, Y, mech)
         wdot_canterax = np.array(wdot_canterax)
         
         # Compare
