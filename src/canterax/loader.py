@@ -25,6 +25,7 @@ def load_mechanism(yaml_file: str) -> MechData:
     # Element Data
     element_names = tuple(sol.element_names)
     n_elements = len(element_names)
+    atomic_weights = jnp.array(sol.atomic_weights)
     element_matrix = np.zeros((n_elements, n_species))
     for i, spec in enumerate(sol.species()):
         for el, count in spec.composition.items():
@@ -49,6 +50,12 @@ def load_mechanism(yaml_file: str) -> MechData:
         
         nasa_T_low[i] = poly.min_temp
         nasa_T_high[i] = poly.max_temp
+
+    viscosity_poly = np.zeros((n_species, 5))
+    conductivity_poly = np.zeros((n_species, 5))
+    for i in range(n_species):
+        viscosity_poly[i] = sol.get_viscosity_polynomial(i)
+        conductivity_poly[i] = sol.get_thermal_conductivity_polynomial(i)
 
     # 2. Reaction Data
     reactant_stoich = np.zeros((n_reactions, n_species))
@@ -194,11 +201,17 @@ def load_mechanism(yaml_file: str) -> MechData:
         n_elements=n_elements,
         element_names=element_names,
         element_matrix=jnp.array(element_matrix),
+        atomic_weights=atomic_weights,
         nasa_low=jnp.array(nasa_low),
         nasa_high=jnp.array(nasa_high),
         nasa_T_mid=jnp.array(nasa_T_mid),
         nasa_T_low=jnp.array(nasa_T_low),
         nasa_T_high=jnp.array(nasa_T_high),
+        reference_pressure=float(sol.reference_pressure),
+        min_temp=float(sol.min_temp),
+        max_temp=float(sol.max_temp),
+        thermo_model=sol.thermo_model,
+        phase_of_matter=sol.phase_of_matter,
         n_reactions=n_reactions,
         max_reactants=max_reactants,
         max_products=max_products,
@@ -228,5 +241,8 @@ def load_mechanism(yaml_file: str) -> MechData:
         reactant_stoich_sparse=reactant_stoich_sparse,
         product_stoich_sparse=product_stoich_sparse,
         net_stoich_sparse=net_stoich_sparse,
-        efficiencies_sparse=efficiencies_sparse
+        efficiencies_sparse=efficiencies_sparse,
+        transport_model=sol.transport_model,
+        viscosity_poly=jnp.array(viscosity_poly),
+        conductivity_poly=jnp.array(conductivity_poly)
     )

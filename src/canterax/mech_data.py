@@ -14,6 +14,7 @@ class MechData(eqx.Module):
     n_elements: int = eqx.field(static=True)
     element_names: tuple = eqx.field(static=True)
     element_matrix: jax.Array       # (n_elements, n_species)
+    atomic_weights: jax.Array       # (n_elements,) kg/kmol
     
     # NASA-7 coefficients
     # Format: (n_species, 7)
@@ -22,6 +23,11 @@ class MechData(eqx.Module):
     nasa_T_mid: jax.Array           # (n_species,)
     nasa_T_low: jax.Array           # (n_species,)
     nasa_T_high: jax.Array          # (n_species,)
+    reference_pressure: float = eqx.field(static=True)
+    min_temp: float = eqx.field(static=True)
+    max_temp: float = eqx.field(static=True)
+    thermo_model: str = eqx.field(static=True)
+    phase_of_matter: str = eqx.field(static=True)
     
     # Reaction info
     n_reactions: int = eqx.field(static=True)
@@ -83,3 +89,8 @@ class MechData(eqx.Module):
     product_stoich_sparse: any = None
     net_stoich_sparse: any = None
     efficiencies_sparse: any = None
+
+    # Transport metadata / fitted property polynomials
+    transport_model: str = eqx.field(static=True, default="none")
+    viscosity_poly: jax.Array | None = None       # (n_species, 5)
+    conductivity_poly: jax.Array | None = None    # (n_species, 5)
