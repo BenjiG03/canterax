@@ -5,189 +5,101 @@
 Canterax consists of 8 core modules:
 
 | Module | Purpose |
-|--------|---------|
+| --- | --- |
 | `constants.py` | Physical constants |
-| `mech_data.py` | Mechanism data structure |
-| `loader.py` | YAML mechanism parser |
-| `thermo.py` | NASA-7 thermodynamics |
-| `kinetics.py` | Reaction rate calculations |
-| `reactor.py` | ODE integration |
-| `solution.py` | User-facing API |
-| `equilibrate.py` | Gibbs minimization |
+| `mech_data.py` | Frozen mechanism data structure |
+| `loader.py` | YAML mechanism parsing and mechanism extraction |
+| `thermo.py` | Ideal-gas NASA-7 thermodynamics and transport property helpers |
+| `kinetics.py` | Reaction rate and production-rate calculations |
+| `reactor.py` | ODE integration for reactor trajectories |
+| `solution.py` | User-facing Cantera-like ideal-gas `Solution` API |
+| `equilibrate.py` | `TP` / `HP` equilibrium |
 
----
+## `mech_data.py`
 
-## constants.py
+`MechData` stores the arrays extracted from Cantera for use in JAX code, including:
 
-Defines fundamental physical constants:
+- species and element names
+- molecular and atomic weights
+- element matrix
+- NASA-7 coefficients and temperature limits
+- reaction stoichiometry and Arrhenius parameters
+- three-body / falloff data
+- transport polynomial coefficients for viscosity and thermal conductivity
 
-```python
-R_GAS = 8.31446261815324  # J/(mol·K) - Universal gas constant
-```
+## `loader.py`
 
----
+`load_mechanism(yaml_file)` loads a Cantera YAML file and extracts:
 
-## mech_data.py
+- species / element metadata
+- NASA-7 polynomial coefficients
+- stoichiometric and kinetic arrays
+- transport model name
+- fitted pure-species transport polynomials from Cantera
 
-`MechData` is an Equinox module storing mechanism arrays:
+## `thermo.py`
 
-```python
-class MechData(eqx.Module):
-    n_species: int              # Number of species
-    n_reactions: int            # Number of reactions
-    mol_weights: jnp.ndarray    # [n_species] - kg/mol
-    
-    # Stoichiometry
-    nu_reactants: jnp.ndarray   # [n_reactions, n_species]
-    nu_products: jnp.ndarray    # [n_reactions, n_species]
-    
-    # Arrhenius parameters
-    A: jnp.ndarray              # [n_reactions] - Pre-exponential
-    b: jnp.ndarray              # [n_reactions] - Temperature exponent
-    Ea: jnp.ndarray             # [n_reactions] - Activation energy (J/mol)
-    
-    # NASA-7 coefficients
-    nasa_low: jnp.ndarray       # [n_species, 7]
-    nasa_high: jnp.ndarray      # [n_species, 7]
-    nasa_T_mid: jnp.ndarray     # [n_species]
-    
-    # Three-body and falloff
-    is_three_body: jnp.ndarray  # [n_reactions] - Boolean mask
-    third_body_efficiencies: jnp.ndarray  # [n_reactions, n_species]
-    is_falloff: jnp.ndarray     # [n_reactions]
-    falloff_params: jnp.ndarray # [n_reactions, 10] - Troe parameters
-```
+Provides the pure functions that back the ThermoPhase surface:
 
----
+- species standard-state properties from NASA-7 fits
+- mixture enthalpy, internal energy, entropy, Gibbs free energy
+- density and volume in mass and molar form
+- partial molar arrays and chemical potentials
+- mixture viscosity and thermal conductivity
 
-## loader.py
+## `solution.py`
 
-`load_mechanism(yaml_file)` parses a Cantera YAML file and returns a `MechData` object.
+`Solution` is the current Cantera-like ideal-gas wrapper.
 
-**Key Steps**:
-1. Load mechanism via `ct.Solution(yaml_file)`
-2. Extract stoichiometry matrices
-3. Extract Arrhenius parameters (converting units to SI)
-4. Extract NASA-7 polynomial coefficients
-5. Build three-body efficiency matrices
-6. Package into `MechData`
+### State surface
 
----
+- Composition / scalar state:
+  `T`, `P`, `X`, `Y`, `basis`
+- State pairs / triples:
+  `TP`, `TPX`, `TPY`, `HP`, `HPX`, `HPY`, `UV`, `UVX`, `UVY`, `SP`, `SPX`, `SPY`, `SV`, `SVX`, `SVY`, `TD`, `TDX`, `TDY`, `DP`, `DPX`, `DPY`
 
-## thermo.py
+### Thermodynamic properties
 
-Implements NASA-7 polynomial thermodynamics:
+- Explicit forms:
+  `cp_mole`, `cp_mass`, `cv_mole`, `cv_mass`, `enthalpy_mole`, `enthalpy_mass`, `int_energy_mole`, `int_energy_mass`, `entropy_mole`, `entropy_mass`, `gibbs_mole`, `gibbs_mass`, `density_mole`, `density_mass`, `volume_mole`, `volume_mass`
+- Basis-aware aliases:
+  `h`, `u`, `s`, `g`, `cp`, `cv`, `v`, `density`
+- Transport:
+  `viscosity`, `thermal_conductivity`, `transport_model`
 
-### Functions
+### Species-level arrays
 
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `get_cp_R` | `(T, low, high, T_mid) -> [n_species]` | Cp/R |
-| `get_h_RT` | `(T, low, high, T_mid) -> [n_species]` | H/(RT) |
-| `get_s_R` | `(T, low, high, T_mid) -> [n_species]` | S/R |
-| `compute_mixture_props` | `(T, P, Y, mech) -> (cp_mass, h_mass, s_mass, rho)` | Mixture properties |
+- `standard_cp_R`
+- `standard_enthalpies_RT`
+- `standard_entropies_R`
+- `standard_int_energies_RT`
+- `standard_gibbs_RT`
+- `partial_molar_cp`
+- `partial_molar_enthalpies`
+- `partial_molar_entropies`
+- `partial_molar_int_energies`
+- `chemical_potentials`
 
-### NASA-7 Form
+### Metadata / helpers
 
-$$C_p/R = a_1 + a_2 T + a_3 T^2 + a_4 T^3 + a_5 T^4$$
+- `thermo_model`, `phase_of_matter`, `is_compressible`, `is_pure`
+- `reference_pressure`, `min_temp`, `max_temp`, `state_size`
+- `mean_molecular_weight`, `molecular_weights`, `atomic_weights`
+- `species_name`, `species_index`, `element_name`, `element_index`, `n_atoms`
+- `mass_fraction_dict`, `mole_fraction_dict`
+- `equilibrate(...)`
 
-$$H/(RT) = a_1 + \frac{a_2}{2}T + \frac{a_3}{3}T^2 + \frac{a_4}{4}T^3 + \frac{a_5}{5}T^4 + \frac{a_6}{T}$$
+For the detailed property inventory, see [[Thermodynamics]].
 
-$$S/R = a_1 \ln T + a_2 T + \frac{a_3}{2}T^2 + \frac{a_4}{3}T^3 + \frac{a_5}{4}T^4 + a_7$$
+## `equilibrate.py`
 
----
+Implements the currently supported equilibrium modes:
 
-## kinetics.py
+- `TP`
+- `HP`
 
-Implements reaction rate calculations.
+`TP` uses the element-potential / Gibbs formulation. `HP` wraps the `TP` solve in an outer temperature iteration to enforce constant enthalpy at fixed pressure.
 
-### Main Function
+## `reactor.py`
 
-```python
-def compute_wdot(T, P, Y, mech) -> (wdot, h_mass, cp_mass, rho, h_mol)
-```
-
-Returns:
-- `wdot`: Net production rates [mol/m³/s]
-- `h_mass`: Mixture enthalpy [J/kg]
-- `cp_mass`: Mixture heat capacity [J/kg/K]
-- `rho`: Density [kg/m³]
-- `h_mol`: Species enthalpies [J/kmol] (optimization artifact)
-
-### Rate Calculation Steps
-
-1. **Forward Rates**: Arrhenius form $k_f = A T^b \exp(-E_a/RT)$
-2. **Equilibrium Constants**: From thermodynamics $K_c = K_p (RT/P_{atm})^{\Delta\nu}$
-3. **Reverse Rates**: $k_r = k_f / K_c$
-4. **Three-Body**: $[M] = \sum \alpha_i [X_i]$
-5. **Troe Falloff**: Lindemann-Hinshelwood with Troe blending
-6. **Net Rates**: $\dot\omega_i = \sum_j \nu_{ij} q_j$
-
----
-
-## reactor.py
-
-Provides ODE integration for reactor simulations.
-
-### ReactorNet Class
-
-```python
-class ReactorNet(eqx.Module):
-    mech: MechData
-    
-    def advance(self, T0, P0, Y0, t_end, rtol=1e-7, atol=1e-10, solver=None):
-        # Returns diffrax solution object
-```
-
-### ODE System
-
-State vector: $\mathbf{y} = [T, Y_1, Y_2, ..., Y_n]$
-
-$$\frac{dY_i}{dt} = \frac{\dot\omega_i M_i}{\rho}$$
-
-$$\frac{dT}{dt} = -\frac{\sum h_i \dot\omega_i}{\rho c_p}$$
-
----
-
-## solution.py
-
-User-facing API wrapper with Cantera-like interface.
-
-### Properties
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `T` | float | Temperature [K] |
-| `P` | float | Pressure [Pa] |
-| `Y` | array | Mass fractions |
-| `X` | array | Mole fractions |
-| `density` | float | Density [kg/m³] |
-| `cp_mass` | float | Cp [J/kg/K] |
-| `enthalpy_mass` | float | H [J/kg] |
-
-### State Setters
-
-```python
-gas.TP = 1500, 101325
-gas.TPY = 1500, 101325, Y_array
-gas.TPX = 1500, 101325, "CH4:1, O2:2"
-```
-
----
-
-## equilibrate.py
-
-Gibbs minimization equilibrium solver using the Element Potential Method.
-
-### Function
-
-```python
-def equilibrate(solution, XY='TP'):
-    # Modifies solution.Y in-place to equilibrium composition
-```
-
-### Algorithm
-
-1. Formulate Lagrangian: $L = G - \sum \lambda_e (n_e - \sum a_{ie} n_i)$
-2. Solve KKT conditions using `optimistix.least_squares`
-3. Iterate until element conservation and Gibbs minimum are satisfied
+Provides the stiff reactor ODE integration used for trajectory and sensitivity validation. The current validation suite benchmarks Kvaerno5 and BDF-based paths against Cantera.
