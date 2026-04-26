@@ -75,3 +75,7 @@ jax_cache/
 
 # Chemical mechanisms
 *.yaml
+
+#Scratch files
+profiling/
+scratch/
