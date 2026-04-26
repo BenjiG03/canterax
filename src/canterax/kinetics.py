@@ -1,3 +1,5 @@
+"""Reaction-rate and source-term computations for ideal-gas mechanisms."""
+
 import jax
 import jax.numpy as jnp
 from .constants import R_GAS, ONE_ATM
@@ -71,7 +73,7 @@ def compute_kf(T, conc, mech, use_experimental_sparse=False):
 
 @jax.jit
 def compute_Kc(T, mech):
-    """Compute equilibrium constants Kc for all reactions."""
+    """Compute concentration-based equilibrium constants for all reactions."""
     h_RT = get_h_RT(T, mech.nasa_low, mech.nasa_high, mech.nasa_T_mid)
     s_R = get_s_R(T, mech.nasa_low, mech.nasa_high, mech.nasa_T_mid)
     g_RT = h_RT - s_R
@@ -94,7 +96,9 @@ def compute_Kc(T, mech):
 def compute_wdot(T, P, Y, mech, use_experimental_sparse=False):
     """Compute net production rates for all species.
     
-    Returns: (wdot, h_mass, cp_mass, rho)
+    Returns:
+        ``(wdot, h_mass, cp_mass, rho, h_mol)`` where ``wdot`` is in
+        mol/m^3/s and ``h_mol`` contains partial molar enthalpies.
     """
     # 1. Mixture properties
     from .thermo import compute_mixture_props

@@ -1,3 +1,5 @@
+"""Mechanism loading utilities backed by Cantera YAML parsing."""
+
 import yaml
 import numpy as np
 import jax

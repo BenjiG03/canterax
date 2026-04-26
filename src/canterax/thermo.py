@@ -1,3 +1,5 @@
+"""Ideal-gas thermodynamic and transport property routines."""
+
 import jax
 import jax.numpy as jnp
 
@@ -55,33 +57,39 @@ def get_s_R(T, nasa_low, nasa_high, T_mid):
 
 @jax.jit
 def mass_to_mole_fractions(Y, mol_weights):
+    """Convert species mass fractions to mole fractions."""
     y_mw = Y / mol_weights
     return y_mw / jnp.sum(y_mw)
 
 
 @jax.jit
 def mole_to_mass_fractions(X, mol_weights):
+    """Convert species mole fractions to mass fractions."""
     y_unnorm = X * mol_weights
     return y_unnorm / jnp.sum(y_unnorm)
 
 
 @jax.jit
 def mean_molecular_weight(Y, mol_weights):
+    """Return the mixture mean molecular weight from mass fractions."""
     return 1.0 / jnp.sum(Y / mol_weights)
 
 
 @jax.jit
 def standard_cp_R(T, mech):
+    """Return standard-state species heat capacities normalized by ``R``."""
     return get_cp_R(T, mech.nasa_low, mech.nasa_high, mech.nasa_T_mid)
 
 
 @jax.jit
 def standard_enthalpies_RT(T, mech):
+    """Return standard-state species enthalpies normalized by ``RT``."""
     return get_h_RT(T, mech.nasa_low, mech.nasa_high, mech.nasa_T_mid)
 
 
 @jax.jit
 def standard_entropies_R(T, P, mech):
+    """Return standard-state species entropies normalized by ``R``."""
     return get_s_R(T, mech.nasa_low, mech.nasa_high, mech.nasa_T_mid) - jnp.log(
         P / mech.reference_pressure
     )
@@ -89,31 +97,37 @@ def standard_entropies_R(T, P, mech):
 
 @jax.jit
 def standard_int_energies_RT(T, mech):
+    """Return standard-state species internal energies normalized by ``RT``."""
     return standard_enthalpies_RT(T, mech) - 1.0
 
 
 @jax.jit
 def standard_gibbs_RT(T, P, mech):
+    """Return standard-state species Gibbs energies normalized by ``RT``."""
     return standard_enthalpies_RT(T, mech) - standard_entropies_R(T, P, mech)
 
 
 @jax.jit
 def partial_molar_cp(T, mech):
+    """Return species partial molar heat capacities."""
     return standard_cp_R(T, mech) * R_GAS
 
 
 @jax.jit
 def partial_molar_enthalpies(T, mech):
+    """Return species partial molar enthalpies."""
     return standard_enthalpies_RT(T, mech) * R_GAS * T
 
 
 @jax.jit
 def partial_molar_int_energies(T, mech):
+    """Return species partial molar internal energies."""
     return standard_int_energies_RT(T, mech) * R_GAS * T
 
 
 @jax.jit
 def chemical_potentials(T, P, Y, mech):
+    """Return species chemical potentials for the current mixture state."""
     X = mass_to_mole_fractions(Y, mech.mol_weights)
     log_term = jnp.log(jnp.maximum(X, _TINY))
     return (standard_gibbs_RT(T, P, mech) + log_term) * R_GAS * T
@@ -121,6 +135,7 @@ def chemical_potentials(T, P, Y, mech):
 
 @jax.jit
 def partial_molar_entropies(T, P, Y, mech):
+    """Return species partial molar entropies for the current mixture state."""
     X = mass_to_mole_fractions(Y, mech.mol_weights)
     log_term = jnp.log(jnp.maximum(X, _TINY))
     return standard_entropies_R(T, P, mech) * R_GAS - R_GAS * log_term
@@ -218,6 +233,7 @@ def compute_mixture_props(T, P, Y, mech):
 
 @jax.jit
 def species_viscosities(T, mech):
+    """Evaluate fitted pure-species viscosities at temperature ``T``."""
     logt = jnp.log(T)
     poly = jnp.stack([jnp.ones_like(logt), logt, logt**2, logt**3, logt**4])
     sqvisc = jnp.sqrt(jnp.sqrt(T)) * (mech.viscosity_poly @ poly)
@@ -226,6 +242,7 @@ def species_viscosities(T, mech):
 
 @jax.jit
 def species_thermal_conductivities(T, mech):
+    """Evaluate fitted pure-species thermal conductivities at ``T``."""
     logt = jnp.log(T)
     poly = jnp.stack([jnp.ones_like(logt), logt, logt**2, logt**3, logt**4])
     return jnp.sqrt(T) * (mech.conductivity_poly @ poly)
@@ -233,6 +250,7 @@ def species_thermal_conductivities(T, mech):
 
 @jax.jit
 def mixture_viscosity(T, Y, mech):
+    """Compute mixture viscosity using Wilke-style mixing."""
     X = mass_to_mole_fractions(Y, mech.mol_weights)
     X = jnp.maximum(X, 1e-20)
     X = X / jnp.sum(X)
@@ -250,6 +268,7 @@ def mixture_viscosity(T, Y, mech):
 
 @jax.jit
 def mixture_thermal_conductivity(T, Y, mech):
+    """Compute mixture thermal conductivity from species fits and mixing."""
     X = mass_to_mole_fractions(Y, mech.mol_weights)
     X = jnp.maximum(X, 1e-20)
     X = X / jnp.sum(X)

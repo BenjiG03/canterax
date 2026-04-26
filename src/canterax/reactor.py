@@ -1,3 +1,5 @@
+"""Closed-reactor ODE definitions and time-integration wrapper."""
+
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -40,7 +42,7 @@ class ReactorNet(eqx.Module):
     
     @eqx.filter_jit
     def advance(self, T0, P, Y0, t_end, rtol=1e-7, atol=1e-10, solver=None, saveat=None, max_steps=100000, dt0=1e-8, stepsize_controller=None):
-        """Simulate combustion trajectory."""
+        """Advance a constant-pressure reactor trajectory to ``t_end``."""
         state0 = jnp.concatenate([jnp.array([T0]), Y0])
         args = (P, self.mech)
         

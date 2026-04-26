@@ -1,3 +1,5 @@
+"""Cantera-like solution wrapper built on top of Canterax primitives."""
+
 import numpy as np
 import jax.numpy as jnp
 
@@ -28,6 +30,7 @@ class Solution:
     """A Cantera-like ideal-gas ThermoPhase wrapper for Canterax."""
 
     def __init__(self, yaml_file: str):
+        """Create a solution object from a Cantera-compatible YAML mechanism."""
         self.mech = load_mechanism(yaml_file)
         self.n_species = self.mech.n_species
         self.n_reactions = self.mech.n_reactions
@@ -550,28 +553,35 @@ class Solution:
         return float(mean_molecular_weight(self._Y, self.mech.mol_weights))
 
     def species_name(self, k: int):
+        """Return the species name for index ``k``."""
         return self.species_names[k]
 
     def species_index(self, species):
+        """Return the species index for a name or integer-like identifier."""
         if isinstance(species, (int, np.integer)):
             return int(species)
         return self.species_names.index(species)
 
     def element_name(self, m: int):
+        """Return the element name for index ``m``."""
         return self.element_names[m]
 
     def element_index(self, element):
+        """Return the element index for a name or integer-like identifier."""
         if isinstance(element, (int, np.integer)):
             return int(element)
         return self.element_names.index(element)
 
     def n_atoms(self, species, element):
+        """Return the number of atoms of ``element`` in ``species``."""
         return int(self.mech.element_matrix[self.element_index(element), self.species_index(species)])
 
     def mass_fraction_dict(self, threshold: float = 0.0):
+        """Return species mass fractions above ``threshold`` as a dictionary."""
         return {name: float(val) for name, val in zip(self.species_names, self.Y) if float(val) > threshold}
 
     def mole_fraction_dict(self, threshold: float = 0.0):
+        """Return species mole fractions above ``threshold`` as a dictionary."""
         return {name: float(val) for name, val in zip(self.species_names, self.X) if float(val) > threshold}
 
     @property
@@ -744,6 +754,7 @@ class Solution:
         estimate_equil=0,
         log_level=0,
     ):
+        """Mutate the state to equilibrium using the requested constraint pair."""
         from .equilibrate import equilibrate as eq_func
 
         return eq_func(

@@ -1,3 +1,5 @@
+"""Open-reactor flow models with inlet and outlet mass flow controllers."""
+
 import jax
 import jax.numpy as jnp
 import equinox as eqx

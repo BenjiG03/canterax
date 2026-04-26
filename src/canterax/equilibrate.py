@@ -1,3 +1,5 @@
+"""Equilibrium solvers exposed through the ``Solution.equilibrate`` API."""
+
 import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
@@ -35,6 +37,7 @@ def _solve_equil_core(y0, gi_const, A_active, b_active, rtol, max_steps):
 
 
 def _equilibrate_tp_state(mech, T, P, Y0, rtol, max_steps):
+    """Solve fixed-``T``/``P`` equilibrium for a starting mass-fraction state."""
     n0 = Y0 / mech.mol_weights
     b = jnp.dot(mech.element_matrix, n0)
 
@@ -91,7 +94,7 @@ def equilibrate(
     estimate_equil=0,
     log_level=0,
 ):
-    """Perform equilibrium calculation with a Cantera-like API subset."""
+    """Perform ``TP`` or ``HP`` equilibrium with a Cantera-like API subset."""
     if XY is None:
         XY = "TP"
     XY = XY.upper()

@@ -1,3 +1,5 @@
+"""Backward differentiation formula solver utilities."""
+
 import jax
 import jax.numpy as jnp
 from jax import jacfwd, jit, lax
