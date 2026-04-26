@@ -8,6 +8,10 @@ import pytest
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
 from canterax.solution import Solution
+from jp10_utils import find_jp10_path
+
+
+JP10_PATH = find_jp10_path()
 
 
 STATE_CASES = [
@@ -190,13 +194,15 @@ EQUILIBRIUM_CASES = [
     ("gri30.yaml", 2000.0, ct.one_atm, "CH4:1.0,O2:2.0,N2:7.52", 5e-5),
     ("h2o2.yaml", 1250.0, ct.one_atm, "H2:2.0,O2:1.0,AR:4.0", 2e-5),
     ("gri30_highT.yaml", 2200.0, 1.5 * ct.one_atm, "CO:1.0,O2:0.5,N2:1.88", 8e-5),
-    (os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "jp10.yaml")), 1500.0, ct.one_atm, "C10H16:1,O2:14,N2:52.64", 8e-5),
+    (JP10_PATH, 1500.0, ct.one_atm, "C10H16:1,O2:14,N2:52.64", 8e-5),
 ]
 
 
 @pytest.mark.parametrize("XY", ["TP", "HP"])
 @pytest.mark.parametrize("mech,T,P,X,y_tol", EQUILIBRIUM_CASES)
 def test_equilibrium_parity(XY, mech, T, P, X, y_tol):
+    if mech is None:
+        pytest.skip("jp10.yaml is not available in this workspace")
     sol_ct, sol_jx = make_solutions_for_mech(mech, T, P, X)
     sol_ct.equilibrate(XY)
     sol_jx.equilibrate(XY)

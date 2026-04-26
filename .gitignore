@@ -72,3 +72,6 @@ Thumbs.db
 # JAX cache
 jax_cache/
 .jax_cache/
+
+# Chemical mechanisms
+*.yaml

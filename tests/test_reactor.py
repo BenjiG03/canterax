@@ -15,6 +15,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src"
 
 from canterax.loader import load_mechanism
 from canterax.reactor import ReactorNet
+from jp10_utils import find_jp10_path
+
+
+JP10_PATH = find_jp10_path()
 
 
 TRAJECTORY_CASES = [
@@ -40,7 +44,7 @@ TRAJECTORY_CASES = [
     },
     {
         "label": "jp10_oxidation",
-        "mech": os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "jp10.yaml")),
+        "mech": JP10_PATH,
         "T0": 1500.0,
         "P": ct.one_atm,
         "X0": "C10H16:1.0, O2:14.0, N2:52.64",
@@ -53,6 +57,8 @@ TRAJECTORY_CASES = [
 
 @pytest.mark.parametrize("case", TRAJECTORY_CASES, ids=[case["label"] for case in TRAJECTORY_CASES])
 def test_reactor_trajectory_parity(case):
+    if case["mech"] is None:
+        pytest.skip("jp10.yaml is not available in this workspace")
     mech = load_mechanism(case["mech"])
     sol_ct = ct.Solution(case["mech"])
 
