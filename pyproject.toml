@@ -9,15 +9,16 @@ description = "A differentiable, GPU-resident chemical kinetics library using JA
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "jax>=0.4.0",
-    "jaxlib>=0.4.0",
-    "equinox>=0.11.0",
-    "diffrax>=0.5.0",
-    "optimistix>=0.0.6",
-    "cantera>=3.0.0",
-    "pyyaml",
-    "numpy",
-    "matplotlib",
+    "jax>=0.8.1",
+    "jaxlib>=0.8.1",
+    "equinox>=0.13.1",
+    "diffrax>=0.7.2",
+    "optimistix>=0.1.0",
+    "lineax>=0.1.0",
+    "cantera>=3.2.0",
+    "pyyaml>=6.0",
+    "numpy>=2.0.0",
+    "matplotlib>=3.9.0",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +27,22 @@ dev = [
     "black",
     "isort",
 ]
+notebooks = [
+    "jupyter",
+    "tabulate",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.canterax.tested-dependency-versions]
+jax = ">=0.8.1, <=0.10.0"
+jaxlib = ">=0.8.1, <=0.10.0"
+equinox = ">=0.13.1, <=0.13.7"
+diffrax = ">=0.7.2, <=0.7.2"
+optimistix = ">=0.1.0, <=0.1.0"
+lineax = ">=0.1.0, <=0.1.0"
+cantera = ">=3.2.0, <=3.2.0"
+pyyaml = ">=6.0, <=6.0.3"
+numpy = ">=2.0.0, <=2.4.4"
+matplotlib = ">=3.9.0, <=3.10.9"

@@ -54,6 +54,7 @@ profile_default/
 ipython_config.py
 
 # Virtual environments
+.venv-*/
 .venv/
 venv/
 ENV/
@@ -79,3 +80,4 @@ jax_cache/
 #Scratch files
 profiling/
 scratch/
+**dep_floor_probe**
