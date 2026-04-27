@@ -15,7 +15,13 @@ https://canterax.readthedocs.io/en/latest/
 - Differentiable reactor integration with JAX and Diffrax
 
 ## Installation
+From pypi:
 
+```bash
+pip install canterax
+```
+
+For local development:
 ```bash
 git clone https://github.com/BenjiG03/canterax.git
 cd canterax

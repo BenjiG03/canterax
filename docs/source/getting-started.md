@@ -2,12 +2,16 @@
 
 ## Installation
 
-Clone the repository and install it into an environment that already has a supported Python and compiler stack for the JAX ecosystem.
-
+For local development:
 ```bash
 git clone https://github.com/BenjiG03/canterax.git
 cd canterax
 pip install -e .
+```
+
+From pypi:
+```bash
+pip install canterax
 ```
 
 ## Runtime dependencies
