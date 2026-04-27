@@ -1,6 +1,7 @@
 # Canterax
 
 Differentiable, JAX-based chemical kinetics with a Cantera-like ideal-gas `Solution` API.
+https://canterax.readthedocs.io/en/latest/
 
 ## Features
 
