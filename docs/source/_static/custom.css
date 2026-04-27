@@ -1,0 +1,21 @@
+body {
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+div.sphinxsidebar h3,
+div.sphinxsidebar h4 {
+  letter-spacing: 0.02em;
+}
+
+div.body h1,
+div.body h2,
+div.body h3 {
+  font-weight: 650;
+}
+
+div.admonition,
+div.note,
+div.tip,
+div.warning {
+  border-radius: 6px;
+}
