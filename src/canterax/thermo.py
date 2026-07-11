@@ -214,7 +214,15 @@ def compute_thermo_state(T, P, Y, mech):
 
 @jax.jit
 def compute_mixture_props(T, P, Y, mech):
-    """Compute legacy mixture thermodynamic properties.
+    """Compute the mixture thermodynamic properties needed by reaction-rate
+    and reactor right-hand-side evaluations.
+
+    Deliberately computes ONLY these four quantities (one Cp/R and one H/RT
+    polynomial evaluation, no entropy/Gibbs path): this function sits inside
+    stiff-integrator right-hand sides that are traced and re-differentiated
+    many times (implicit stage Jacobians, forward-mode tangents), where every
+    traced op multiplies the trace/compile cost of the caller. Use
+    ``compute_thermo_state`` when entropies or potentials are actually needed.
 
     Returns:
         cp_mass: mixture mass-weighted heat capacity (J/kg/K)
@@ -222,13 +230,15 @@ def compute_mixture_props(T, P, Y, mech):
         rho: mixture density (kg/m^3)
         h_mol: partial molar enthalpies (J/kmol)
     """
-    state = compute_thermo_state(T, P, Y, mech)
-    return (
-        state["cp_mass"],
-        state["h_mass"],
-        state["density_mass"],
-        state["partial_molar_enthalpies"],
-    )
+    cp_R = standard_cp_R(T, mech)
+    h_RT = standard_enthalpies_RT(T, mech)
+    # mass-basis mixture sums: sum_i Y_i * (prop_i / W_i) == (mole sum)/W_mix
+    inv_weights = Y / mech.mol_weights
+    cp_mass = R_GAS * jnp.sum(inv_weights * cp_R)
+    h_mass = R_GAS * T * jnp.sum(inv_weights * h_RT)
+    rho = P / (R_GAS * T * jnp.sum(inv_weights))  # ideal gas, W_mix = 1/sum(Y_i/W_i)
+    h_mol = h_RT * R_GAS * T
+    return cp_mass, h_mass, rho, h_mol
 
 
 @jax.jit
