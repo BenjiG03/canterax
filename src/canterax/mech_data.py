@@ -84,9 +84,10 @@ class MechData(eqx.Module):
     troe_params: jax.Array          # (n_reactions, 4)
     has_troe: jax.Array             # (n_reactions,) bool
     
-    # Experimental sparse representations (BCOO)
-    reactant_stoich_sparse: any = None
-    product_stoich_sparse: any = None
+    # Experimental sparse representations (BCOO). Only these two feed the
+    # traced kinetics path (kinetics.py's compute_wdot); reactant_stoich and
+    # product_stoich have no sparse consumer, so their BCOO forms were dead
+    # computation and were removed (see loader.py).
     net_stoich_sparse: any = None
     efficiencies_sparse: any = None
 

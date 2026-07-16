@@ -1,6 +1,9 @@
 """Equilibrium solvers exposed through the ``Solution.equilibrate`` API."""
 
+from functools import partial
+
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import optimistix as optx
 
@@ -82,6 +85,110 @@ def _equilibrate_tp_state(mech, T, P, Y0, rtol, max_steps):
 
 def _basis_enthalpy(state, basis):
     return float(state["h_mass"] if basis == "mass" else state["h_mole"])
+
+
+def _equilibrate_tp_state_fixed_shape(mech, T, P, Y0, rtol, max_steps):
+    """Fixed-shape sibling of ``_equilibrate_tp_state`` for ``jax.jit`` callers.
+
+    ``_equilibrate_tp_state`` prunes species/elements the mixture cannot reach
+    via dynamic-length boolean indexing (``jnp.where(...)`` with no ``size=``),
+    which is exactly the pattern ``jax.jit`` cannot trace. This sibling skips
+    the pruning and uses every species/element in ``mech`` unconditionally,
+    trading generality for jittability. Valid whenever the unburned mixture
+    already spans every element the mechanism's species draw on (true for any
+    complete combustion mechanism fed a fuel+air mixture, e.g. a JP-10/air
+    mechanism over C/H/O/N/Ar) -- callers with a genuinely sparse mixture
+    (an element entirely absent from ``Y0``) need ``_equilibrate_tp_state``.
+    """
+    n0 = Y0 / mech.mol_weights
+    b = mech.element_matrix @ n0
+
+    h_RT = get_h_RT(T, mech.nasa_low, mech.nasa_high, mech.nasa_T_mid)
+    s_R = get_s_R(T, mech.nasa_low, mech.nasa_high, mech.nasa_T_mid)
+    gi_const = h_RT - s_R + jnp.log(P / ONE_ATM)
+
+    ntot0 = jnp.maximum(jnp.sum(n0), 1e-10)
+    weights = jnp.sqrt(jnp.maximum(n0 / ntot0, 1e-6))
+    rhs = (gi_const + jnp.log(jnp.maximum(n0 / ntot0, 1e-10))) * weights
+    design_mat = mech.element_matrix.T * weights[:, None]
+    lams0, _, _, _ = jnp.linalg.lstsq(design_mat, rhs)
+
+    s0 = (mech.element_matrix.T @ lams0) - gi_const + jnp.log(ntot0)
+    y0 = jnp.concatenate([s0, lams0, jnp.array([jnp.log(ntot0)])])
+    res = _solve_equil_core(y0, gi_const, mech.element_matrix, b, rtol, max_steps)
+
+    Y_equil = jnp.exp(res.value[: mech.n_species]) * mech.mol_weights
+    Y_equil = Y_equil / jnp.sum(Y_equil)
+    return Y_equil, res
+
+
+@partial(jax.jit, static_argnames=("max_steps", "max_bisect_iter"))
+def equilibrate_hp_fixed_shape(mech, T0, P, Y0, target_h, rtol=1e-9, max_steps=1000,
+                               max_bisect_iter=60):
+    """Fused, jittable HP (constant-enthalpy/pressure) equilibrium solve.
+
+    ``Solution.equilibrate("HP")`` is a Cantera-compatible convenience API:
+    every property access it touches (``sol.h``, ``compute_thermo_state``, the
+    Python-level bisection over T) dispatches as its own eager XLA op, since
+    that flexibility (arbitrary constraint pairs, dynamic active-species
+    pruning) cannot be captured in one static jaxpr. That is fine for
+    interactive use but costs ~200 separately-traced-and-compiled kernels for
+    a single HP solve -- prohibitive for a setup-time call inside a
+    JAX-heavy build path (jax_dmrj's flameholder ignited-branch seed is the
+    motivating case; see its call site).
+
+    This is the fused alternative: the whole bisection is one ``lax.fori_loop``
+    (a FIXED trip count, unlike ``equilibrate``'s early-exit ``while``) around
+    ``_equilibrate_tp_state_fixed_shape`` (no dynamic-shape species pruning,
+    see its docstring), so the entire solve traces and compiles as ONE XLA
+    program. Same "all species/elements active" precondition as
+    ``_equilibrate_tp_state_fixed_shape``; same accuracy trade as fixing the
+    bisection trip count instead of stopping early once converged (bisection
+    error after ``max_bisect_iter`` steps is ``(hi0 - lo0) / 2**max_bisect_iter``,
+    below 1e-9 K for the default 60 steps over any physical mechanism's
+    min/max NASA-poly temperature range).
+
+    Parameters
+    ----------
+    mech : MechData
+        Canterax mechanism (supplies ``element_matrix``, NASA coefficients,
+        ``min_temp``/``max_temp``).
+    T0, P, Y0 : float, float, ndarray
+        Unburned mixture temperature [K], pressure [Pa], mass fractions.
+    target_h : float
+        Target mixture-mass-basis specific enthalpy [J/kg] to match (the
+        unburned mixture's enthalpy, for a constant-enthalpy/pressure solve).
+    rtol : float
+        Relative tolerance passed to the inner element-potential KKT solve.
+    max_steps : int
+        Max iterations of the inner Levenberg-Marquardt KKT solve.
+    max_bisect_iter : int
+        Fixed bisection trip count for the outer temperature search.
+
+    Returns
+    -------
+    T_equil, Y_equil : float, ndarray
+        Equilibrium product temperature [K] and mass fractions.
+    """
+    def enthalpy_residual(T):
+        Y_equil, _ = _equilibrate_tp_state_fixed_shape(mech, T, P, Y0, rtol, max_steps)
+        return compute_thermo_state(T, P, Y_equil, mech)["h_mass"] - target_h
+
+    lo0 = jnp.maximum(1.0, 0.5 * mech.min_temp)
+    hi0 = jnp.maximum(mech.max_temp, T0)
+
+    def bisect_step(_, carry):
+        lo, hi = carry
+        mid = 0.5 * (lo + hi)
+        f_mid = enthalpy_residual(mid)
+        lo = jnp.where(f_mid > 0.0, lo, mid)
+        hi = jnp.where(f_mid > 0.0, mid, hi)
+        return lo, hi
+
+    lo, hi = jax.lax.fori_loop(0, max_bisect_iter, bisect_step, (lo0, hi0))
+    T_equil = 0.5 * (lo + hi)
+    Y_equil, _ = _equilibrate_tp_state_fixed_shape(mech, T_equil, P, Y0, rtol, max_steps)
+    return T_equil, Y_equil
 
 
 def equilibrate(
