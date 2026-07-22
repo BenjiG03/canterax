@@ -70,6 +70,42 @@ def test_equilibrium():
     assert err < 1e-4 # Less strict for equilibrium penalty method
     assert err_comb < 1e-3
 
+
+def test_equilibrate_hp_fixed_shape_matches_solution_equilibrate():
+    """equilibrate_hp_fixed_shape (one fused jax.jit HP solve, see its
+    docstring) must match Solution.equilibrate("HP") to solver tolerance --
+    it exists purely to avoid the ~200 separately-dispatched eager kernels
+    the general Cantera-compatible path costs at setup time (W1 in jax_dmrj),
+    not to change the physics. Requires every mechanism ELEMENT to have
+    nonzero abundance in the unburned mixture (see the function's docstring),
+    so both mixtures below carry a trace of every gri30 element (O, H, C, N,
+    Ar) even where that species is not the intended fuel/oxidizer -- a
+    mixture missing an element (e.g. no argon) is exactly the unsupported,
+    genuinely-sparse case the docstring calls out."""
+    from canterax.equilibrate import equilibrate_hp_fixed_shape
+    from canterax.thermo import compute_thermo_state
+
+    yaml_path = "gri30.yaml"
+    for X0, T0, P in [
+        ("CH4:1.0, O2:2.0, N2:7.52, AR:0.01", 1200.0, 101325.0),
+        ("H2:2.0, O2:1.0, N2:3.76, CH4:0.01, AR:0.01", 800.0, 2.0e5),
+    ]:
+        sol_ct = ct.Solution(yaml_path)
+        sol_ct.TPX = T0, P, X0
+        sol_ct.equilibrate("HP")
+        T_expected, Y_expected = float(sol_ct.T), np.asarray(sol_ct.Y)
+
+        sol_jan = Solution(yaml_path)
+        sol_jan.set_TPX(T0, P, X0)
+        Y0 = jnp.asarray(sol_jan.Y)
+        target_h = float(compute_thermo_state(T0, P, Y0, sol_jan.mech)["h_mass"])
+
+        T_fused, Y_fused = equilibrate_hp_fixed_shape(sol_jan.mech, T0, P, Y0, target_h)
+
+        assert abs(float(T_fused) - T_expected) < 1e-2
+        assert np.max(np.abs(np.asarray(Y_fused) - Y_expected)) < 1e-6
+
+
 if __name__ == "__main__":
     try:
         test_equilibrium()

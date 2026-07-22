@@ -1,12 +1,27 @@
 """Mechanism loading utilities backed by Cantera YAML parsing."""
 
+from functools import partial
+
 import yaml
 import numpy as np
 import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import cantera as ct
+from jax.experimental import sparse
 from .mech_data import MechData
+
+
+@partial(jax.jit, static_argnames=("nse",))
+def _build_bcoo(dense, nse):
+    """Fused BCOO conversion: one compiled program, not one per internal op.
+
+    ``nse`` is a static Python int (the caller counts nonzeros on the
+    plain-numpy array before it ever becomes a jax array) so the sparse
+    output has a fixed, traceable shape -- see the load_mechanism call site.
+    """
+    return sparse.BCOO.fromdense(dense, nse=nse)
+
 
 def load_mechanism(yaml_file: str) -> MechData:
     """Load a Cantera YAML mechanism and return a MechData object.
@@ -22,12 +37,12 @@ def load_mechanism(yaml_file: str) -> MechData:
     # 1. Species Data
     species_names = tuple(sol.species_names)
     # MW: kg/kmol
-    mol_weights = jnp.array(sol.molecular_weights)
-    
+    mol_weights = np.asarray(sol.molecular_weights)
+
     # Element Data
     element_names = tuple(sol.element_names)
     n_elements = len(element_names)
-    atomic_weights = jnp.array(sol.atomic_weights)
+    atomic_weights = np.asarray(sol.atomic_weights)
     element_matrix = np.zeros((n_elements, n_species))
     for i, spec in enumerate(sol.species()):
         for el, count in spec.composition.items():
@@ -190,25 +205,46 @@ def load_mechanism(yaml_file: str) -> MechData:
             default_efficiency[i] = 1.0
 
     # 4. Experimental BCOO Sparse Matrices
-    from jax.experimental import sparse
-    reactant_stoich_sparse = sparse.BCOO.fromdense(jnp.array(reactant_stoich))
-    product_stoich_sparse = sparse.BCOO.fromdense(jnp.array(product_stoich))
-    net_stoich_sparse = sparse.BCOO.fromdense(jnp.array(net_stoich))
-    efficiencies_sparse = sparse.BCOO.fromdense(jnp.array(efficiencies))
+    # Only net_stoich and efficiencies feed the traced kinetics path
+    # (kinetics.py's compute_wdot); reactant_stoich/product_stoich have no
+    # sparse consumer anywhere in canterax, so building their BCOO forms was
+    # dead computation -- and, along with the two below, one of the setup-time
+    # eager-dispatch storms W1 (jax_dmrj/PERF_AUDIT.md) traced back to
+    # load_mechanism. Two things made BCOO.fromdense eager: its default
+    # nse=None infers the nonzero count via jax ops (an untraceable dynamic
+    # shape), and it was called bare, outside any jit. Passing a static nse
+    # (counted on the plain-numpy dense array, before any jax array exists)
+    # fixes the shape, and _build_bcoo below fuses the conversion into one
+    # compiled program instead of each internal primitive dispatching
+    # separately.
+    net_stoich_sparse = _build_bcoo(jnp.array(net_stoich), int(np.count_nonzero(net_stoich)))
+    efficiencies_sparse = _build_bcoo(jnp.array(efficiencies), int(np.count_nonzero(efficiencies)))
 
+    # Fields below are handed to MechData as plain NumPy, not jnp.array(...).
+    # Every jnp.array(...) conversion here used to be its own separately-
+    # dispatched "stage" compile at load time (~20 tiny eager kernels per
+    # mechanism load, part of the W1 eager-setup-dispatch storm -- see
+    # PERF_AUDIT.md); MechData's fields flow into jax.jit-decorated functions
+    # (compute_thermo_state, compute_wdot, equilibrate_hp_fixed_shape, ...)
+    # either directly as jit arguments or as explicit array arguments pulled
+    # out beforehand, and JAX converts NumPy leaves to device arrays as part
+    # of that call, at no extra eager cost. mol_weights/atomic_weights are
+    # already jnp (needed eagerly above, for the sol.molecular_weights /
+    # sol.atomic_weights conversion); the sparse BCOO fields must stay jax
+    # arrays (built via _build_bcoo above).
     return MechData(
         n_species=n_species,
         species_names=species_names,
-        mol_weights=jnp.array(mol_weights),
+        mol_weights=mol_weights,
         n_elements=n_elements,
         element_names=element_names,
-        element_matrix=jnp.array(element_matrix),
+        element_matrix=element_matrix,
         atomic_weights=atomic_weights,
-        nasa_low=jnp.array(nasa_low),
-        nasa_high=jnp.array(nasa_high),
-        nasa_T_mid=jnp.array(nasa_T_mid),
-        nasa_T_low=jnp.array(nasa_T_low),
-        nasa_T_high=jnp.array(nasa_T_high),
+        nasa_low=nasa_low,
+        nasa_high=nasa_high,
+        nasa_T_mid=nasa_T_mid,
+        nasa_T_low=nasa_T_low,
+        nasa_T_high=nasa_T_high,
         reference_pressure=float(sol.reference_pressure),
         min_temp=float(sol.min_temp),
         max_temp=float(sol.max_temp),
@@ -217,34 +253,32 @@ def load_mechanism(yaml_file: str) -> MechData:
         n_reactions=n_reactions,
         max_reactants=max_reactants,
         max_products=max_products,
-        reactants_idx=jnp.array(reactants_idx),
-        reactants_nu=jnp.array(reactants_nu),
-        products_idx=jnp.array(products_idx),
-        products_nu=jnp.array(products_nu),
-        reactant_stoich=jnp.array(reactant_stoich),
-        product_stoich=jnp.array(product_stoich),
-        net_stoich=jnp.array(net_stoich),
-        A=jnp.array(A),
-        b=jnp.array(b),
-        Ea=jnp.array(Ea),
-        is_three_body=jnp.array(is_three_body),
+        reactants_idx=reactants_idx,
+        reactants_nu=reactants_nu,
+        products_idx=products_idx,
+        products_nu=products_nu,
+        reactant_stoich=reactant_stoich,
+        product_stoich=product_stoich,
+        net_stoich=net_stoich,
+        A=A,
+        b=b,
+        Ea=Ea,
+        is_three_body=is_three_body,
         max_efficiencies=max_efficiencies,
-        efficiencies_idx=jnp.array(efficiencies_idx),
-        efficiencies_val=jnp.array(efficiencies_val),
-        default_efficiency=jnp.array(default_efficiency),
-        efficiencies=jnp.array(efficiencies),
-        is_reversible=jnp.array(is_reversible),
-        is_falloff=jnp.array(is_falloff),
-        A_low=jnp.array(A_low),
-        b_low=jnp.array(b_low),
-        Ea_low=jnp.array(Ea_low),
-        troe_params=jnp.array(troe_params),
-        has_troe=jnp.array(has_troe),
-        reactant_stoich_sparse=reactant_stoich_sparse,
-        product_stoich_sparse=product_stoich_sparse,
+        efficiencies_idx=efficiencies_idx,
+        efficiencies_val=efficiencies_val,
+        default_efficiency=default_efficiency,
+        efficiencies=efficiencies,
+        is_reversible=is_reversible,
+        is_falloff=is_falloff,
+        A_low=A_low,
+        b_low=b_low,
+        Ea_low=Ea_low,
+        troe_params=troe_params,
+        has_troe=has_troe,
         net_stoich_sparse=net_stoich_sparse,
         efficiencies_sparse=efficiencies_sparse,
         transport_model=sol.transport_model,
-        viscosity_poly=jnp.array(viscosity_poly),
-        conductivity_poly=jnp.array(conductivity_poly)
+        viscosity_poly=viscosity_poly,
+        conductivity_poly=conductivity_poly
     )
